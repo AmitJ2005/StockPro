@@ -17,63 +17,64 @@ logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 def fetch_stock_data(request, symbol):
+    """Fetch basic stock data using Yahoo Finance API."""
     try:
-        logger.debug(f"Fetching stock data for symbol: {symbol}")
         stock_data = yf.Ticker(symbol)
         info = stock_data.info
-        logger.debug(f"Stock info: {info}")
-        data = {
+        return Response({
             'symbol': symbol,
             'name': info.get('shortName'),
-            'last_price': info.get('currentPrice', 0.0),  # Set default to 0.0
+            'last_price': info.get('currentPrice', 0.0),
             'ebidta': info.get('ebitda'),
             'net_income': info.get('netIncomeToCommon'),
-        }
-        return Response(data)
+        })
     except Exception as e:
-        logger.error(f"Error fetching stock data for {symbol}: {e}", exc_info=True)
-        return Response({'error': str(e)}, status=400)
+        logger.error(f"Error fetching stock data for {symbol}: {e}")
+        return Response({'error': 'Failed to fetch stock data'}, status=400)
+
 
 @api_view(['GET', 'POST', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def manage_watchlist(request):
+    """Manage user's watchlist - Add, View, or Remove stocks."""
     user = request.user
+
     if request.method == 'GET':
         watchlist = Watchlist.objects.filter(user=user)
-        serializer = WatchlistSerializer(watchlist, many=True)
-        return Response(serializer.data)
+        return Response(WatchlistSerializer(watchlist, many=True).data)
+
+    stock_symbol = request.data.get('symbol')
+    if not stock_symbol:
+        return Response({'error': 'Stock symbol is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     if request.method == 'POST':
-        stock_symbol = request.data.get('symbol')
         watchlist, created = Watchlist.objects.get_or_create(user=user, stock_symbol=stock_symbol)
-        if created:
-            return Response({'message': 'Stock added to watchlist'})
-        return Response({'message': 'Stock already in watchlist'})
+        return Response({'message': 'Stock added to watchlist' if created else 'Stock already in watchlist'})
 
     if request.method == 'DELETE':
-        stock_symbol = request.data.get('symbol')
         Watchlist.objects.filter(user=user, stock_symbol=stock_symbol).delete()
         return Response({'message': 'Stock removed from watchlist'})
 
-# Load stock names and symbols
+
+# Load stock names and symbols for search functionality
 stock_names_path = os.path.join(settings.BASE_DIR, 'api', 'stock_names.json')
 with open(stock_names_path, 'r') as f:
     STOCK_DATA = json.load(f)
 
 @api_view(['GET'])
 def search_stocks(request):
+    """Search for stocks using fuzzy matching."""
     query = request.GET.get('query', '').strip()
     if not query:
         return JsonResponse([], safe=False)
 
-    # Perform fuzzy matching
     matches = process.extract(query, STOCK_DATA.keys(), limit=10)
-    results = [{'name': name, 'symbol': STOCK_DATA[name]} for name, _ in matches]
+    return JsonResponse([{'name': name, 'symbol': STOCK_DATA[name]} for name, _ in matches], safe=False)
 
-    return JsonResponse(results, safe=False)
 
 @api_view(['POST'])
 def fetch_stock_details(request):
+    """Fetch detailed stock information from Yahoo Finance."""
     symbol = request.data.get('symbol')
     if not symbol:
         return Response({'error': 'Symbol is required'}, status=400)
@@ -81,7 +82,7 @@ def fetch_stock_details(request):
     try:
         stock_data = yf.Ticker(symbol)
         info = stock_data.info
-        data = {
+        return Response({
             'symbol': info.get('symbol'),
             'name': info.get('shortName'),
             'last_price': info.get('currentPrice'),
@@ -100,22 +101,23 @@ def fetch_stock_details(request):
             'industry': info.get('industry'),
             'market_cap': info.get('marketCap'),
             'enterprise_value': info.get('enterpriseValue'),
-        }
-        return Response(data)
+        })
     except Exception as e:
-        logger.error(f"Error fetching stock details for {symbol}: {e}", exc_info=True)
-        return Response({'error': str(e)}, status=400)
-    
+        logger.error(f"Error fetching stock details for {symbol}: {e}")
+        return Response({'error': 'Failed to fetch stock details'}, status=400)
+
 
 @api_view(['POST'])
 def register_user(request):
+    """Register a new user."""
     username = request.data.get('username')
     password = request.data.get('password')
+
     if not username or not password:
         return Response({'error': 'Username and password are required'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     if User.objects.filter(username=username).exists():
         return Response({'error': 'Username already exists'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    user = User.objects.create_user(username=username, password=password)
+
+    User.objects.create_user(username=username, password=password)
     return Response({'message': 'User registered successfully'}, status=status.HTTP_201_CREATED)

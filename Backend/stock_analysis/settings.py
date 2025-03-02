@@ -58,15 +58,35 @@ LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
+        'file': {
+            'level': 'WARNING',  # Change to ERROR to suppress more logs
+            'class': 'logging.FileHandler',
+            'filename': 'django.log',  # Save logs to a file instead of console
+        },
         'console': {
+            'level': 'INFO',  # Change DEBUG to INFO to reduce logs
             'class': 'logging.StreamHandler',
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'DEBUG',
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'yfinance': {  # Suppress yfinance logs
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'urllib3': {  # Suppress HTTP connection logs
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
 }
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
