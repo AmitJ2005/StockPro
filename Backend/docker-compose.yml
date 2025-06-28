@@ -1,0 +1,22 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stockpro-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+    depends_on:
+      - redis
+  redis:
+    image: redis:7-alpine
+    container_name: stockpro-redis
+    ports:
+      - "6379:6379"
+    restart: always
