@@ -6,3 +6,4 @@ gunicorn
 whitenoise
 dj-database-url
 django-extensions
+djangorestframework-simplejwt
